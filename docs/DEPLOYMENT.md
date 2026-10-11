@@ -1,12 +1,12 @@
 # Настройка Supabase и Vercel: действия владельца
 
-Здесь описаны текущие настройки приложения в **`sardor2005/Yavka2`**: Production — **`feature/yavka-mvp-backend`**, исправление регистрации — **`fix/auth-registration-limits`**. Готовый MVP перенесён из `sardor2005/Yavka` с сохранением обеих историй Git и исходного интерфейса. Ранее целевой репозиторий назывался `Yavka-2.0`; его первоначальные документы сохранены в `legacy/repository-onboarding/`.
+Здесь описаны текущие настройки приложения в **`sardor2005/Yavkak`**: Production — **`feature/yavka-mvp-backend`**, исправление регистрации — **`fix/auth-registration-limits`**. Готовый MVP перенесён из `sardor2005/Yavka` с сохранением обеих историй Git и исходного интерфейса. Ранее целевой репозиторий назывался `Yavka2` и `Yavka-2.0`; его первоначальные документы сохранены в `legacy/repository-onboarding/`.
 
 Владелец уже создал Supabase-проект, подтвердил успешное выполнение трёх SQL-миграций и открыл Production сайта. Полный Cloud API/SMTP сценарий независимо не проверен. Результаты локальных проверок: [TESTING.md](TESTING.md).
 
 ## 1. GitHub: получите изменения без замены проекта
 
-1. Откройте выбранный репозиторий **`sardor2005/Yavka2`**.
+1. Откройте выбранный репозиторий **`sardor2005/Yavkak`**.
 2. Проверьте ветку **`fix/auth-registration-limits`**, изменения и итоговые проверки нового PR. Исходный frontend и логотип сохраняются; прежняя браузерная beta архивирована в `legacy/beta/`.
 3. PR переноса №1 уже объединён в `feature/yavka-mvp-backend`; эта ветка теперь содержит приложение. Новый PR исправления регистрации направлен в неё же. Для проверки изменений выбирайте Preview ветки исправления.
 4. Убедитесь, что в Git не попали реальные `.env`, пароли, административные ключи, фото пользователей и резервные копии.
@@ -138,7 +138,7 @@ npm run check
 
 ## 7. Существующий Vercel Hobby
 
-1. Откройте существующий Vercel-проект **`yavkak`**, сайт `yavkak.vercel.app`; в **Settings → Git** проверьте подключение **`sardor2005/Yavka2`**. Первая версия в отдельном репозитории `Yavka` сохраняется.
+1. Откройте существующий Vercel-проект **`yavkak`**, сайт `yavkak.vercel.app`; в **Settings → Git** проверьте подключение **`sardor2005/Yavkak`**. Первая версия в отдельном репозитории `Yavka` сохраняется.
 2. Проверьте root directory: каталог приложения с `package.json`. Framework — Vite, build command — `npm run build`, output directory — `dist`, Node.js — 22.x или 24.x (минимум 22.12).
 3. В текущем интерфейсе откройте **Settings → Environments → Production**, найдите **Environment Variables → Project → Add Environment Variable**. Добавьте `VITE_SUPABASE_URL` и `VITE_SUPABASE_PUBLISHABLE_KEY` для **Production**, а для проверки PR — также **Preview**. Используйте параметры уже созданного проекта владельца. Для разрушительных тестов нужна отдельная тестовая база или локальный Supabase.
 4. PR переноса №1 уже объединён; Production использует `feature/yavka-mvp-backend` с приложением. Для проверки исправлений в **Deployments → Create Deployment** выберите **`fix/auth-registration-limits`** и создайте **Preview**. Добавьте точный Preview hostname в Supabase согласно разделу Auth. Проверьте `/auth/callback`, `/auth/reset`, `/meetings/<id>` и `/join/<token>` при прямом открытии/обновлении. SPA fallback должен возвращать `index.html` для страниц приложения.

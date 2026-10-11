@@ -1,6 +1,6 @@
 # Регистрация и предполагаемый предел двух аккаунтов
 
-Дата: 12 октября 2026 года, Asia/Tashkent. Репозиторий: `sardor2005/Yavka2`, ветка `fix/auth-registration-limits`; база PR — `496e750`, объединённый владельцем PR переноса №1. Текущий сайт: `https://yavkak.vercel.app`.
+Дата: 12 октября 2026 года, Asia/Tashkent. Репозиторий: `sardor2005/Yavkak` (прежнее имя — `Yavka2`), ветка `fix/auth-registration-limits`; база PR — `496e750`, объединённый владельцем PR переноса №1. Текущий сайт: `https://yavkak.vercel.app`.
 
 ## Результат аудита
 
