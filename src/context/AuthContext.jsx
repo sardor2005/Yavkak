@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { configured, supabase, requireClient } from '../services/supabase.js';
+import { toAuthError } from '../services/authErrors.js';
 
 const AuthContext = createContext(null);
 const nextQuery = () => {
@@ -47,7 +48,7 @@ export function AuthProvider({ children }) {
     });
     return () => { active = false; };
   }, [user?.id]);
-  const checked = async result => { const value = await result; if (value.error) throw new Error(value.error.message); return value.data; };
+  const checked = async result => { const value = await result; if (value.error) throw toAuthError(value.error); return value.data; };
   const value = {
     user, profile, session, loading, configured, error, authEvent, refreshProfile,
     signUp: async ({ email, password, name }) => {
