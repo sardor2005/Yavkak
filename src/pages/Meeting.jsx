@@ -52,13 +52,13 @@ export default function Meeting() {
 
   const reloadMeeting = useCallback(async () => {
     try { const value = await getMeeting(id); setMeeting(value); setError(''); return value; }
-    catch (cause) { setMeeting(null); setError(cause.message || 'Не удалось загрузить встречу.'); return null; }
+    catch (cause) { if (cause.code !== 'NETWORK_ERROR') setMeeting(null); setError(cause.message || 'Не удалось загрузить встречу.'); return null; }
     finally { setLoading(false); }
   }, [id]);
 
   useEffect(() => {
     let live = true;
-    getMeeting(id).then((value) => { if (live) { setMeeting(value); setError(''); } }).catch((cause) => { if (live) { setMeeting(null); setError(cause.message || 'Не удалось загрузить встречу.'); } }).finally(() => { if (live) setLoading(false); });
+    getMeeting(id).then((value) => { if (live) { setMeeting(value); setError(''); } }).catch((cause) => { if (live) { if (cause.code !== 'NETWORK_ERROR') setMeeting(null); setError(cause.message || 'Не удалось загрузить встречу.'); } }).finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
   }, [id, meetings]);
   useEffect(() => { setLoading(true); setMeeting(null); setEditing(false); setEditForm(null); setConfirmation(null); setGeneratedInvite(null); setQrOpen(false); setInvitations([]); setFriendId(''); }, [id]);
@@ -170,6 +170,7 @@ export default function Meeting() {
 
   return <div className="meeting-page">
     <Link className="back-link" to={completed ? '/history' : '/'}><ArrowLeft size={17} />{completed ? 'К истории встреч' : 'К встречам'}</Link>
+    {error && <div className="form-error" role="alert">{error} <button type="button" className="button secondary" onClick={reloadMeeting}>Попробовать ещё раз</button></div>}
     <div className="mp-title-row"><div className="mp-title-main"><span className="mp-event-icon"><Coffee size={28} strokeWidth={1.7} /></span><div><div className="mp-title-badges"><span className={`badge ${completed || cancelled ? 'gray' : 'green'}`}><span className="mp-status-dot" />{statuses[meeting.status] || 'Встреча'}</span></div><h1>{meeting.title}</h1></div></div></div>
     {meeting.description && <p className="mp-description">{meeting.description}</p>}
     <div className="mp-meta"><span><Users size={15} />{peopleLabel(participants.length)}</span><span><Crown size={15} />Организатор — {meeting.organizer?.name || 'организатор встречи'}</span>{active && <span className="mp-you">Вы: {active.name}</span>}</div>

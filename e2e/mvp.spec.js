@@ -130,7 +130,9 @@ test('two independent accounts share a meeting, chat, statuses, photos and persi
     await expect(bob.page.getByRole('log').getByText('Встретимся у входа', { exact: true })).toBeVisible();
     await bob.context.setOffline(true);
     await bob.page.getByRole('button', { name: 'Обновить историю', exact: true }).click();
-    await expect(bob.page.getByRole('alert').first()).toBeVisible();
+    await expect(bob.page.locator('.meeting-chat [role="alert"]')).toBeVisible();
+    await expect(bob.page.getByRole('heading', { name: `Встреча ${run}`, exact: true })).toBeVisible();
+    await expect(bob.page.getByRole('log').getByText('Встретимся у входа', { exact: true })).toBeVisible();
     await alice.page.getByLabel('Сообщение', { exact: true }).fill('После восстановления сети');
     await alice.page.getByRole('button', { name: 'Отправить', exact: true }).click();
     await expect(alice.page.getByRole('log').getByText('После восстановления сети', { exact: true })).toBeVisible();

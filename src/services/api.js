@@ -8,7 +8,11 @@ const publicProfile = row => row && ({ id: row.id, name: row.name, publicId: row
 async function result(query) {
   const { data, error } = await query;
   if (error) {
-    if (/fetch|network|connection/i.test(error.message)) throw new Error('Нет соединения с сервером. Проверьте сеть и повторите действие.');
+    if (/fetch|network|connection/i.test(error.message)) {
+      const failure = new Error('Нет соединения с сервером. Проверьте сеть и повторите действие.');
+      failure.code = 'NETWORK_ERROR';
+      throw failure;
+    }
     throw new Error(error.message || 'Не удалось выполнить запрос.');
   }
   return data;
