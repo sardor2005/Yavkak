@@ -1,0 +1,10 @@
+import { Link } from 'react-router-dom';
+import { ArrowLeft, Images, LoaderCircle, Plus } from 'lucide-react';
+import { useApp } from '../context/AppContext.jsx';
+import MeetingCard from '../components/MeetingCard.jsx';
+
+export default function History() {
+  const { meetings, loading, error, refresh, loadMore, hasMore } = useApp();
+  const past = meetings.filter(meeting => meeting.status === 'completed' || meeting.status === 'cancelled').sort((first, second) => (second.completedAt || second.startsAt || second.createdAt).localeCompare(first.completedAt || first.startsAt || first.createdAt));
+  return <><div className="page-header"><div><span className="eyebrow">ВАШИ ВСТРЕЧИ</span><h1>История встреч <span className="count-pill">{past.length}</span></h1><p className="muted">Завершённые и отменённые встречи вашей компании.</p></div><Link to="/" className="button secondary"><ArrowLeft size={18} />К встречам</Link></div>{error && <div className="retry-panel" role="alert"><span>{error}</span><button className="button secondary compact-button" onClick={refresh}>Повторить</button></div>}{loading && !meetings.length ? <div className="loading-state page-loading" role="status"><LoaderCircle size={21} />Загружаем историю…</div> : error && !meetings.length ? null : past.length ? <div className="meeting-grid history-grid">{past.map(meeting => <MeetingCard key={meeting.id} meeting={meeting} />)}</div> : <div className="card empty-state large-empty"><div className="empty-icon"><Images size={40} /></div><h2>{hasMore ? 'Посмотрим дальше' : 'Лучшее ещё впереди'}</h2><p>{hasMore ? 'На этой странице нет завершённых или отменённых встреч. Загрузите следующую страницу истории.' : 'Завершённые и отменённые встречи появятся здесь. Планы вашей компании сохраняются в аккаунте.'}</p><Link to="/create" className="button primary"><Plus size={18} />Запланировать встречу</Link></div>}{hasMore && <div className="pagination-action"><button className="button secondary" onClick={loadMore} disabled={loading}>{loading && <LoaderCircle size={17} />}{loading ? 'Загружаем…' : 'Показать ещё встречи'}</button></div>}</>;
+}

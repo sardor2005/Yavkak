@@ -1,0 +1,58 @@
+# Local development only. Configure production Auth and redirects in Supabase.
+project_id = "yavka"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[db.migrations]
+enabled = true
+
+[db.seed]
+enabled = false
+
+[realtime]
+enabled = true
+
+[studio]
+enabled = false
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "10MiB"
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:5173"
+additional_redirect_urls = ["http://127.0.0.1:5173/auth/callback", "http://127.0.0.1:5173/auth/reset", "http://localhost:5173/auth/callback", "http://localhost:5173/auth/reset", "http://127.0.0.1:5175/auth/callback", "http://127.0.0.1:5175/auth/reset"]
+enable_signup = true
+enable_anonymous_sign_ins = false
+jwt_expiry = 3600
+
+[auth.rate_limit]
+anonymous_users = 100
+email_sent = 100
+sign_in_sign_ups = 100
+token_verifications = 100
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+
+[edge_runtime]
+enabled = false
+
+[analytics]
+enabled = false
