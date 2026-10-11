@@ -32,7 +32,7 @@ async function mailLink(email, mailUrl) {
   throw new Error('Auth email was not delivered to local Mailpit');
 }
 
-test('two independent accounts share a meeting, chat, statuses, photos and persistent history', async ({ browser }, testInfo) => {
+test('three independent accounts register, preserve their own meetings and enforce private sharing', async ({ browser }, testInfo) => {
   test.skip(!live, 'Requires actual local Supabase; run npm run test:e2e:live');
   test.setTimeout(180000);
   const run = randomUUID().slice(0, 8);
@@ -42,7 +42,7 @@ test('two independent accounts share a meeting, chat, statuses, photos and persi
   async function register(name) {
     const context = await browser.newContext({ baseURL, viewport: testInfo.project.use.viewport, isMobile: !!testInfo.project.use.isMobile, hasTouch: !!testInfo.project.use.hasTouch, timezoneId: 'Asia/Tashkent' });
     contexts.push(context); const page = await context.newPage();
-    const email = `yavka-e2e-${name === 'Алиса' ? 'alice' : 'bob'}-${run}@example.com`, password = `Mvp-${randomUUID()}-1a!`;
+    const email = `yavka-e2e-${randomUUID()}-${run}@example.com`, password = `Mvp-${randomUUID()}-1a!`;
     await page.goto('/auth?mode=register');
     await page.getByLabel('Ваше имя', { exact: true }).fill(name);
     await page.getByLabel('Электронная почта', { exact: true }).fill(email);
@@ -51,21 +51,77 @@ test('two independent accounts share a meeting, chat, statuses, photos and persi
     await expect(page.getByRole('status').filter({ hasText: 'Проверьте почту' })).toBeVisible();
     const link = await mailLink(email, process.env.SUPABASE_TEST_MAILPIT_URL);
     const lookup = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    expect(lookup.error).toBeNull();
     const account = lookup.data.users.find(u => u.email === email);
     expect(account).toBeTruthy();
-    actors.push({ id: account.id, email, password, page, context });
+    const connection = createClient(apiUrl, process.env.SUPABASE_TEST_ANON_KEY, options);
+    const actor = { id: account.id, email, password, page, context, connection };
+    actors.push(actor);
     await page.goto(link);
     await expect(page.getByRole('heading', { name: /Хорошая компания/ })).toBeVisible();
-    return actors.at(-1);
+    await page.goto('/profile');
+    await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
+    await expect(page.locator('.session-note')).toContainText(email);
+    const publicId = (await page.locator('.public-id').textContent()).match(/yavka-[a-f0-9]{16}/)?.[0];
+    expect(publicId).toBeTruthy();
+    actor.publicId = publicId;
+    // This ordinary authenticated client proves the third profile is usable with
+    // its own password and RLS, rather than merely visible to the test administrator.
+    const login = await connection.auth.signInWithPassword({ email, password });
+    expect(login.error).toBeNull();
+    expect(login.data.user.id).toBe(actor.id);
+    expect(login.data.user.email).toBe(email);
+    const profile = await connection.from('profiles').select('id,name,public_id').eq('id', actor.id).single();
+    expect(profile.error).toBeNull();
+    expect(profile.data).toEqual({ id: actor.id, name, public_id: publicId });
+    return actor;
+  }
+  async function expectHiddenMeeting(actor, meetingId) {
+    for (const [table, column] of [['meetings', 'id'], ['chat_messages', 'meeting_id'], ['meeting_photos', 'meeting_id']]) {
+      const result = await actor.connection.from(table).select('id').eq(column, meetingId);
+      expect(result.error).toBeNull();
+      expect(result.data, `${actor.email} must not read private ${table}`).toEqual([]);
+    }
   }
   try {
     const alice = await register('Алиса');
     const bob = await register('Борис');
-    expect(alice.id).not.toBe(bob.id);
-    const profile = await admin.from('profiles').select('public_id').eq('id', bob.id).single();
-    expect(profile.error).toBeNull();
+    const eve = await register('Ева');
+    expect(new Set(actors.map(actor => actor.id)).size).toBe(3);
+    expect(new Set(actors.map(actor => actor.email)).size).toBe(3);
+    expect(new Set(actors.map(actor => actor.publicId)).size).toBe(3);
+
+    await eve.page.goto('/create');
+    const eveTitle = `Личная встреча Евы ${run}`;
+    await eve.page.getByLabel('Название встречи').fill(eveTitle);
+    await eve.page.getByLabel('Название места').fill('Библиотека');
+    await eve.page.getByRole('button', { name: 'Создать встречу', exact: true }).click();
+    await expect(eve.page).toHaveURL(/\/meetings\/[a-f0-9-]+$/);
+    const eveMeetingId = new URL(eve.page.url()).pathname.split('/').at(-1);
+    await expect(eve.page.getByRole('heading', { name: eveTitle, exact: true })).toBeVisible();
+    await eve.page.reload();
+    await expect(eve.page.getByRole('heading', { name: eveTitle, exact: true })).toBeVisible();
+    await eve.page.goto('/profile');
+    await eve.page.getByRole('button', { name: 'Выйти', exact: true }).click();
+    await eve.page.getByLabel('Электронная почта', { exact: true }).fill(eve.email);
+    await eve.page.getByLabel('Пароль', { exact: true }).fill(eve.password);
+    await eve.page.getByRole('button', { name: 'Войти', exact: true }).click();
+    await expect(eve.page).not.toHaveURL(/\/auth(?:[/?#]|$)/);
+    await eve.page.goto('/');
+    await expect(eve.page.getByRole('heading', { name: eveTitle, exact: true })).toBeVisible();
+    await eve.page.goto(`/meetings/${eveMeetingId}`);
+    await expect(eve.page.getByRole('heading', { name: eveTitle, exact: true })).toBeVisible();
+    const resumedEve = await eve.connection.auth.signInWithPassword({ email: eve.email, password: eve.password });
+    expect(resumedEve.error).toBeNull();
+    expect(resumedEve.data.user.id).toBe(eve.id);
+    const ownMeeting = await eve.connection.from('meetings').select('organizer_id,title').eq('id', eveMeetingId).single();
+    expect(ownMeeting.error).toBeNull();
+    expect(ownMeeting.data).toEqual({ organizer_id: eve.id, title: eveTitle });
+    await expectHiddenMeeting(alice, eveMeetingId);
+    await expectHiddenMeeting(bob, eveMeetingId);
+
     await alice.page.goto('/friends');
-    await alice.page.getByLabel('Имя или ID', { exact: true }).fill(profile.data.public_id);
+    await alice.page.getByLabel('Имя или ID', { exact: true }).fill(bob.publicId);
     await alice.page.getByRole('button', { name: 'Найти', exact: true }).click();
     await alice.page.getByRole('button', { name: 'Добавить', exact: true }).click();
     await bob.page.goto('/friends');
@@ -101,6 +157,28 @@ test('two independent accounts share a meeting, chat, statuses, photos and persi
     await bob.page.goto(`/meetings/${meetingId}/memory`);
     await expect(bob.page.locator('.memory-photo img')).toHaveCount(1);
     await expect(bob.page.getByRole('button', { name: /Удалить свою фотографию/ })).toHaveCount(0);
+
+    // A successfully registered third user still cannot see or mutate another
+    // company's real meeting, chat and photo before receiving an invitation.
+    await eve.page.goto('/');
+    await expect(eve.page.getByRole('heading', { name: eveTitle, exact: true })).toBeVisible();
+    await expect(eve.page.getByRole('heading', { name: `Встреча ${run}`, exact: true })).toHaveCount(0);
+    await eve.page.goto(`/meetings/${meetingId}`);
+    await expect(eve.page.getByRole('heading', { name: 'Встреча недоступна', exact: true })).toBeVisible();
+    await expect(eve.page.getByRole('log')).toHaveCount(0);
+    await expect(eve.page.getByLabel('Сообщение', { exact: true })).toHaveCount(0);
+    await eve.page.goto(`/meetings/${meetingId}/memory`);
+    await expect(eve.page.getByRole('heading', { name: 'Воспоминание недоступно', exact: true })).toBeVisible();
+    await expect(eve.page.locator('.memory-photo img')).toHaveCount(0);
+    await expect(eve.page.getByLabel('Добавить фотографии', { exact: true })).toHaveCount(0);
+    await expectHiddenMeeting(eve, meetingId);
+    const deniedChat = await eve.connection.rpc('send_message', { p_meeting_id: meetingId, p_body: 'Посторонний пользователь' });
+    expect(deniedChat.error?.code).toBe('42501');
+    const deniedPhoto = await eve.connection.rpc('reserve_photo', { p_meeting_id: meetingId, p_name: 'outsider.png', p_mime: 'image/png', p_size: png.length });
+    expect(deniedPhoto.error?.code).toBe('42501');
+    const deniedDownload = await eve.connection.storage.from('meeting-photos').download(uploaded[0]);
+    expect(deniedDownload.error).not.toBeNull();
+
     await alice.page.goto(`/meetings/${meetingId}`);
     await alice.page.getByRole('button', { name: 'Завершить встречу', exact: true }).click();
     const completionDialog = alice.page.getByRole('dialog');
@@ -141,11 +219,17 @@ test('two independent accounts share a meeting, chat, statuses, photos and persi
     await expect(bob.page.getByRole('log').getByText('После восстановления сети', { exact: true })).toBeVisible();
     await expect(bob.page.locator('.meeting-chat [role="alert"]')).toHaveCount(0);
     expect(await bob.page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    const domainData = await bob.page.evaluate(() => localStorage.getItem('yavka:repository:v1'));
-    expect(domainData).toBeNull();
+    for (const actor of actors) {
+      await expect(actor.page.getByRole('button', { name: 'Demo', exact: true })).toHaveCount(0);
+      const domainData = await actor.page.evaluate(() => localStorage.getItem('yavka:repository:v1'));
+      expect(domainData).toBeNull();
+    }
   } finally {
     for (const context of contexts) await context.close();
     if (uploaded.length) await admin.storage.from('meeting-photos').remove(uploaded);
-    for (const actor of actors) await admin.auth.admin.deleteUser(actor.id);
+    for (const actor of actors) {
+      await actor.connection.auth.signOut({ scope: 'local' });
+      await admin.auth.admin.deleteUser(actor.id);
+    }
   }
 });
